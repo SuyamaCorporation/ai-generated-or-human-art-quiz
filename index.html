@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI生成 or 人間制作？アート判定クイズ</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  @keyframes slideIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+  .slide-in { animation: slideIn 0.3s ease-out; }
+  @keyframes pop { 0%{transform:scale(1)} 50%{transform:scale(1.08)} 100%{transform:scale(1)} }
+  .pop { animation: pop 0.3s ease; }
+</style>
+</head>
+<body class="bg-gray-900 text-white min-h-screen">
+<div class="max-w-lg mx-auto p-4">
+  <header class="text-center py-5">
+    <h1 class="text-2xl font-bold bg-gradient-to-r from-orange-400 to-pink-400 bg-clip-text text-transparent">AI生成 or 人間制作？</h1>
+    <p class="text-gray-400 text-sm mt-1">アート説明文から制作者を見抜け！</p>
+  </header>
+
+  <!-- Start screen -->
+  <div id="screen-start">
+    <div class="bg-gray-800 rounded-2xl p-6 mb-4 text-center">
+      <div class="text-6xl mb-4">🎨</div>
+      <h2 class="text-xl font-bold mb-2">ルール説明</h2>
+      <p class="text-gray-300 text-sm mb-4 leading-relaxed">
+        作品の説明文を読んで「AI生成」か「人間制作」かを判定します。<br>
+        全15問。最後に判別師レベルを判定します。
+      </p>
+      <div id="best-score-display" class="text-yellow-400 text-sm mb-4"></div>
+      <button onclick="startQuiz()" class="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold py-3 rounded-xl text-lg" aria-label="クイズを開始する">
+        クイズ開始！
+      </button>
+    </div>
+    <div class="bg-gray-800 rounded-2xl p-5">
+      <h3 class="font-bold text-orange-400 mb-3">🔍 AI判別のコツ</h3>
+      <ul class="space-y-2 text-sm text-gray-300" id="tips-list"></ul>
+    </div>
+  </div>
+
+  <!-- Quiz screen -->
+  <div id="screen-quiz" class="hidden">
+    <div class="flex justify-between items-center mb-4">
+      <span id="q-counter" class="text-gray-400 text-sm"></span>
+      <div class="flex gap-1" id="progress-dots" aria-label="問題進捗"></div>
+    </div>
+
+    <div id="question-card" class="bg-gray-800 rounded-2xl p-6 mb-5 slide-in">
+      <div class="text-xs text-gray-500 mb-2 uppercase tracking-wider" id="q-genre"></div>
+      <p id="q-description" class="text-gray-100 leading-relaxed text-base mb-2"></p>
+      <p id="q-detail" class="text-gray-400 text-sm italic"></p>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4 mb-4">
+      <button onclick="answer('ai')" id="btn-ai"
+        class="bg-blue-700 hover:bg-blue-600 text-white font-bold py-5 rounded-2xl text-lg transition active:scale-95"
+        aria-label="AI生成と回答する">
+        🤖 AI生成
+      </button>
+      <button onclick="answer('human')" id="btn-human"
+        class="bg-green-700 hover:bg-green-600 text-white font-bold py-5 rounded-2xl text-lg transition active:scale-95"
+        aria-label="人間制作と回答する">
+        🧑 人間制作
+      </button>
+    </div>
+
+    <div id="feedback-box" class="hidden rounded-xl p-4 mb-4 slide-in">
+      <div id="feedback-verdict" class="text-lg font-bold mb-1"></div>
+      <div id="feedback-explanation" class="text-sm text-gray-300"></div>
+    </div>
+
+    <button id="next-btn" onclick="nextQuestion()" class="hidden w-full bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl transition">
+      次の問題 →
+    </button>
+  </div>
+
+  <!-- Result screen -->
+  <div id="screen-result" class="hidden text-center">
+    <div class="bg-gray-800 rounded-2xl p-7 mb-4">
+      <div id="result-icon" class="text-6xl mb-3"></div>
+      <h2 id="result-level" class="text-2xl font-bold mb-1"></h2>
+      <div id="result-score" class="text-4xl font-bold text-orange-400 mb-2"></div>
+      <div class="text-gray-400 text-sm mb-5" id="result-sub"></div>
+      <div id="result-breakdown" class="text-sm text-left bg-gray-700 rounded-xl p-4 mb-5 space-y-2"></div>
+      <button onclick="startQuiz()" class="w-full bg-gradient-to-r from-orange-500 to-pink-500 text-white font-bold py-3 rounded-xl transition">
+        もう一度プレイ
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  { desc: "完璧な左右対称の肖像画。光の当たり方が自然すぎるほど理想的。背景の細部が溶けるように曖昧になっている。耳の形が左右で微妙に異なる。", detail: "デジタルアート、2024年", genre: "デジタル肖像", answer: "ai", explanation: "背景の曖昧さと完璧すぎる光の表現はAI生成の典型的パターン。耳の左右非対称は観測エラーの特徴。" },
+  { desc: "荒削りな筆跡が目立つ油彩画。意図的なプロポーションの歪み。背景に画家の署名とスタジオ跡の痕跡。絵具の盛り上がりが見てとれる。", detail: "油彩、キャンバス、90×70cm", genre: "油彩絵画", answer: "human", explanation: "意図的な歪みと実物の署名、物理的な絵具の質感は人間の制作物の証。AIは物理的痕跡を再現できない。" },
+  { desc: "数百種の花が一つの花瓶に活けられた静物画。各花の開花タイミングがバラバラで実際には不可能な組み合わせ。光の反射が幾何学的に均一。", detail: "デジタルイラスト", genre: "静物", answer: "ai", explanation: "現実には同時開花しない花の組み合わせと、均一すぎる光反射はAI生成の特徴。物理的矛盾を気にしない。" },
+  { desc: "子どもが描いたような稚拙なタッチで描かれた都市風景。意図的にパースが狂い、建物が傾いている。作家名とギャラリー展示記録あり。", detail: "アクリル画、個展出品作", genre: "都市景観", answer: "human", explanation: "意図的な稚拙さと個展記録は人間アーティストの表現手法。AIは稚拙さを「欠陥」として回避しようとする。" },
+  { desc: "海の波が完璧に繰り返すパターンを形成している。空の雲も対称的に配置。全体に夢のような色彩グラデーション。細部を拡大すると同じパターンが繰り返される。", detail: "デジタルアート", genre: "風景", answer: "ai", explanation: "波のパターン反復と完璧な対称配置、フラクタル的な繰り返しはAI生成の典型的エラーパターン。" },
+  { desc: "カンバスに直接コーヒーをこぼした跡を利用した抽象作品。段ボールの質感とステンシルを組み合わせ。制作過程の写真と日記が添付されている。", detail: "混合メディア、2023年", genre: "抽象", answer: "human", explanation: "偶然性（コーヒーのしみ）の活用と制作日記の存在は人間のアーティスティックプロセスそのもの。" },
+  { desc: "全ての登場人物が6本指を持つ中世の祝宴シーン。テーブルクロスの模様が人物の後ろでは消えている。金の装飾が物理的に不自然なほど輝いている。", detail: "油彩風デジタル画", genre: "歴史画", answer: "ai", explanation: "6本指は典型的なAI生成エラー。背景での模様消失も現在のAIモデルの空間整合性の弱点。" },
+  { desc: "廃工場の壁面に描かれた大型グラフィティ。スプレーの重なりと滴りが見える。地元コミュニティへの社会的メッセージを含む。撮影者のクレジットあり。", detail: "グラフィティ、屋外展示", genre: "ストリートアート", answer: "human", explanation: "物理的な塗料の滴りと社会的文脈、地元コミュニティへの関与は人間のストリートアーティストの特徴。" },
+  { desc: "猫の顔が突然ピザになっているシュールな作品。背景には無数の同じ猫の顔が並ぶ。色彩が饱和しているが調和が取れている。コンセプト説明が存在しない。", detail: "デジタルイラスト", genre: "シュール", answer: "ai", explanation: "コンセプトなしの奇妙な組み合わせと背景の繰り返しパターンはAI生成の特徴。意味より視覚的面白さを優先。" },
+  { desc: "版画技法で刷られた社会的プロパガンダ的作品。印刷ズレが意図的に使われており、作家の政治的声明が作品タイトルに込められている。", detail: "リトグラフ、限定50枚", genre: "版画", answer: "human", explanation: "意図的な印刷ズレの活用と政治的メッセージ、限定版数は人間のアーティストの意図的制作の証。" },
+  { desc: "水面の反射が実際の景色よりも鮮明すぎる湖の風景。空と湖が完璧にミラーリングされている。木々の葉は一枚一枚識別できるが配置がランダムすぎる。", detail: "デジタルフォトリアル絵画", genre: "風景", answer: "ai", explanation: "現実を超えた鮮明すぎる反射と、ランダムに見えて実は反復パターンを持つ葉の配置がAI生成の特徴。" },
+  { desc: "35年間同じ街角を毎日描き続けたシリーズの一枚。季節の変化と年月の積み重ねが重なり合っている。作家の老いに伴うタッチの変化が見てとれる。", detail: "水彩、シリーズ第12,775枚", genre: "風景スケッチ", answer: "human", explanation: "35年の継続と老いに伴うタッチ変化は人間の生の営みの記録。AIには経年変化の記憶がない。" },
+  { desc: "解剖学的に正確すぎる人体デッサン。筋肉の一本一本が均等に描かれており、個人差がない。影の付け方が教科書的に完璧。背景は完全に白。", detail: "デジタルスケッチ", genre: "人体素描", answer: "ai", explanation: "個人差のない解剖学的均一性と教科書的な完璧さはAI生成の特徴。人間のデッサンには描き手の癖が必ず出る。" },
+  { desc: "廃材を組み合わせた立体作品。錆びた金属と流木の質感が時間の流れを語る。作家が被災地で拾った素材のみを使用したという背景がある。", detail: "インスタレーション、混合素材", genre: "立体作品", answer: "human", explanation: "実物素材の物理的質感と被災地という文脈・経験は人間にしか持ち得ない背景。AIには素材を「体験」することができない。" },
+  { desc: "建物の内部と外部が同時に見える不可能建築のイラスト。窓から見える景色が室内に描かれた絵画と一致している。全体にノスタルジックなフィルターがかかっている。", detail: "コンセプトアート", genre: "建築イラスト", answer: "ai", explanation: "不可能建築の表現とノスタルジックフィルターはAIのプロンプト生成で多発するパターン。空間的矛盾を視覚的面白さで処理。" },
+];
+
+const TIPS = [
+  "🔍 背景の細部が曖昧・溶けているのはAIの特徴",
+  "👐 指や耳など細部の左右非対称エラーに注目",
+  "🔄 パターンの不自然な繰り返しはAIのヒント",
+  "📝 制作過程・日記・物理的痕跡は人間の証拠",
+  "🎯 社会的文脈・政治的意図は人間作品に多い",
+  "⚡ 物理的に不可能なことを気にしないのがAI",
+  "🖌️ 意図的な歪み・稚拙さは人間の表現手法",
+];
+
+const HS_KEY = 'art-quiz-best-v1';
+let questions = [], currentQ = 0, score = 0, results = [];
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function startQuiz() {
+  questions = shuffle(QUESTIONS).slice(0, 15);
+  currentQ = 0; score = 0; results = [];
+  showScreen('quiz');
+  renderQuestion();
+}
+
+function showScreen(name) {
+  ['start','quiz','result'].forEach(s => {
+    document.getElementById('screen-' + s).classList.toggle('hidden', s !== name);
+  });
+}
+
+function renderQuestion() {
+  const q = questions[currentQ];
+  document.getElementById('q-counter').textContent = (currentQ + 1) + ' / 15';
+  document.getElementById('q-genre').textContent = q.genre;
+
+  const descEl = document.getElementById('q-description');
+  descEl.textContent = q.desc;
+  const detailEl = document.getElementById('q-detail');
+  detailEl.textContent = q.detail;
+
+  document.getElementById('feedback-box').classList.add('hidden');
+  document.getElementById('next-btn').classList.add('hidden');
+  document.getElementById('btn-ai').disabled = false;
+  document.getElementById('btn-human').disabled = false;
+  document.getElementById('btn-ai').classList.remove('opacity-50');
+  document.getElementById('btn-human').classList.remove('opacity-50');
+
+  // Progress dots
+  const dots = document.getElementById('progress-dots');
+  dots.innerHTML = '';
+  questions.forEach((_, i) => {
+    const dot = document.createElement('div');
+    dot.className = 'w-2 h-2 rounded-full ' +
+      (i < currentQ ? (results[i] ? 'bg-green-500' : 'bg-red-500') :
+       i === currentQ ? 'bg-orange-400' : 'bg-gray-600');
+    dots.appendChild(dot);
+  });
+
+  document.getElementById('question-card').classList.remove('slide-in');
+  void document.getElementById('question-card').offsetWidth;
+  document.getElementById('question-card').classList.add('slide-in');
+}
+
+function answer(choice) {
+  const q = questions[currentQ];
+  const isCorrect = choice === q.answer;
+  if (isCorrect) score++;
+  results.push(isCorrect);
+
+  document.getElementById('btn-ai').disabled = true;
+  document.getElementById('btn-human').disabled = true;
+  document.getElementById('btn-ai').classList.add('opacity-50');
+  document.getElementById('btn-human').classList.add('opacity-50');
+
+  const fb = document.getElementById('feedback-box');
+  fb.classList.remove('hidden','bg-green-900','bg-red-900');
+  fb.classList.add(isCorrect ? 'bg-green-900' : 'bg-red-900');
+
+  const verdict = document.getElementById('feedback-verdict');
+  verdict.textContent = isCorrect ? '✅ 正解！' : '❌ 不正解...正解は「' + (q.answer === 'ai' ? 'AI生成' : '人間制作') + '」';
+  document.getElementById('feedback-explanation').textContent = q.explanation;
+
+  document.getElementById('next-btn').classList.remove('hidden');
+  document.getElementById('next-btn').textContent = currentQ < 14 ? '次の問題 →' : '結果を見る';
+}
+
+function nextQuestion() {
+  currentQ++;
+  if (currentQ >= 15) { showResult(); return; }
+  renderQuestion();
+}
+
+function showResult() {
+  showScreen('result');
+  const pct = Math.round(score / 15 * 100);
+  let icon, level;
+  if (pct >= 90) { icon = '🏆'; level = 'AI判別師レベル: 量子観測者'; }
+  else if (pct >= 73) { icon = '🎓'; level = 'AI判別師レベル: 達人'; }
+  else if (pct >= 53) { icon = '🔍'; level = 'AI判別師レベル: 中級'; }
+  else if (pct >= 40) { icon = '📚'; level = 'AI判別師レベル: 見習い'; }
+  else { icon = '🌱'; level = 'AI判別師レベル: 入門者'; }
+
+  document.getElementById('result-icon').textContent = icon;
+  document.getElementById('result-level').textContent = level;
+  document.getElementById('result-score').textContent = score + ' / 15問正解';
+  document.getElementById('result-sub').textContent = '正答率 ' + pct + '%';
+
+  const bd = document.getElementById('result-breakdown');
+  bd.innerHTML = '';
+  const aiQ = questions.filter(q => q.answer === 'ai');
+  const humQ = questions.filter(q => q.answer === 'human');
+  const aiCorrect = questions.filter((q, i) => q.answer === 'ai' && results[i]).length;
+  const humCorrect = questions.filter((q, i) => q.answer === 'human' && results[i]).length;
+
+  [
+    ['🤖 AI生成問題', aiCorrect + ' / ' + aiQ.length + '問正解'],
+    ['🧑 人間制作問題', humCorrect + ' / ' + humQ.length + '問正解'],
+  ].forEach(([label, val]) => {
+    const row = document.createElement('div'); row.className = 'flex justify-between';
+    const lEl = document.createElement('span'); lEl.className = 'text-gray-300'; lEl.textContent = label;
+    const vEl = document.createElement('span'); vEl.className = 'text-white font-bold'; vEl.textContent = val;
+    row.appendChild(lEl); row.appendChild(vEl);
+    bd.appendChild(row);
+  });
+
+  const best = parseInt(localStorage.getItem(HS_KEY)) || 0;
+  if (score > best) {
+    localStorage.setItem(HS_KEY, score);
+    const newBest = document.createElement('div'); newBest.className = 'text-yellow-400 font-bold text-center';
+    newBest.textContent = '🎉 ベスト更新！';
+    bd.appendChild(newBest);
+  }
+}
+
+// Init tips
+const tipsList = document.getElementById('tips-list');
+TIPS.forEach(tip => {
+  const li = document.createElement('li'); li.className = 'flex items-start gap-2';
+  li.textContent = tip;
+  tipsList.appendChild(li);
+});
+
+// Best score display
+const best = localStorage.getItem(HS_KEY);
+if (best) {
+  document.getElementById('best-score-display').textContent = '最高記録: ' + best + ' / 15問';
+}
+</script>
+</body>
+</html>
